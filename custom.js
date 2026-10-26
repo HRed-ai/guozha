@@ -20,6 +20,7 @@
   var elAside = root.querySelector('.cu-checkin');
   var elPrev = root.querySelector('.cu-prev');
   var elNext = root.querySelector('.cu-next');
+  var elPoem = root.querySelector('.cu-poem-in');
 
   /* ---------------- 存储 ---------------- */
   function blank() { return { v: V, nodes: [] }; }
@@ -128,10 +129,12 @@
 
       g.append(halo, dot, sealG, hit);
 
-      // 竖排站名（与八闸同一套排布）
+      // 竖排站名（与八闸同一套排布；也交给 app.js 做碰撞避让）
       var left = idx % 2 === 0;
       var tx2 = left ? -13 : 13;
       var chars = Array.from(n.name || '私閘');
+      var labelG = document.createElementNS(NS, 'g');
+      labelG.setAttribute('class', 'name-g');
       chars.forEach(function (ch, i) {
         var t = document.createElementNS(NS, 'text');
         t.setAttribute('class', 'name');
@@ -139,8 +142,16 @@
         t.setAttribute('y', -(chars.length - 1) * 6 + i * 12 + 4);
         t.setAttribute('text-anchor', left ? 'end' : 'start');
         t.textContent = ch;
-        g.appendChild(t);
+        labelG.appendChild(t);
       });
+      var leader = document.createElementNS(NS, 'line');
+      leader.setAttribute('class', 'name-leader');
+      leader.setAttribute('vector-effect', 'non-scaling-stroke');
+      leader.setAttribute('x1', left ? -8 : 8);
+      leader.setAttribute('x2', left ? -13 : 13);
+      leader.setAttribute('y1', 0);
+      leader.setAttribute('y2', 4);
+      g.append(leader, labelG);
 
       // 悬停染色：与八闸一致，用这闸自己的颜色
       var col = n.color || '#A6392A';
@@ -167,7 +178,10 @@
       if (window.LEDGER && window.LEDGER.hasSeen(n.id)) g.classList.add('read');
 
       MAP.locksGroup.appendChild(g);
-      MAP.register(g, xy[0], xy[1]);
+      MAP.register(g, xy[0], xy[1], {
+        labelG: labelG, leader: leader,
+        labelN: chars.length, left: left
+      });
       marks[n.id] = g;
     });
   }
@@ -318,7 +332,7 @@
         id: uid('c'), name: '私閘 ' + (d.nodes.length + 1),
         lon: Math.round(ll[0] * 1000) / 1000,
         lat: Math.round(ll[1] * 1000) / 1000,
-        color: '#8C7B62', bg: '', els: makeDefaults(ll[0], ll[1])
+        color: '#8C7B62', bg: '', els: makeDefaults()
       };
       d.nodes.push(n);
       save(d);
@@ -343,29 +357,27 @@
     return best;
   }
 
-  function makeDefaults(lon, lat) {
-    var ST = window.STATIONS || [];
-    var i = nearestStationIdx(lon, lat);
-    var s = ST[i] || ST[0] || {};
-    var sid = s.id || 's01';
-    var verse = (s.text || []).join('\n');
-    var facts = (s.facts || []).join('\n');
+  /* 新建的闸：版式与八闸相同，但没有内容 —— 四个位置都是空占位 */
+  function makeDefaults() {
     return [
-      // 左：场景图，撑满整页高
-      { id: uid('e'), type: 'image', src: 'assets/' + sid + '/scene.jpg', x: 2, y: 4, h: 90 },
-      // 中：竖排文言
-      { id: uid('e'), type: 'text', vertical: true, text: verse,
-        x: 40, y: 6, w: 14, size: 1.8, color: '#2B2620', align: 'right' },
-      // 右：考据
-      { id: uid('e'), type: 'text', text: facts,
-        x: 55, y: 8, w: 18, size: 1.05, color: '#4A3F30', align: 'left' },
-      // 右缘：立绘，脚底贴页脚
-      { id: uid('e'), type: 'image', src: 'assets/' + sid + '/act_a.png', x: 75, y: 28, h: 54 }
+      { id: uid('e'), type: 'image', slot: 'scene', src: '', x: 2, y: 4, h: 66,
+        hint: '此處可以添加景色圖\n點一下選圖' },
+      { id: uid('e'), type: 'text', slot: 'verse', vertical: true, text: '',
+        x: 40, y: 6, w: 14, size: 1.8, color: '#2B2620', align: 'right',
+        hint: '點此添加文字' },
+      { id: uid('e'), type: 'text', slot: 'facts', text: '',
+        x: 56, y: 8, w: 18, size: 1.05, color: '#4A3F30', align: 'left',
+        hint: '點此添加文字' },
+      { id: uid('e'), type: 'image', slot: 'figure', src: '', x: 74, y: 18, h: 52,
+        hint: '此處可以添加人物\n點一下選圖' },
+      /* 打卡日历：和别的东西一样，能拖能改大小 */
+      { id: uid('e'), type: 'calendar', x: 38, y: 58, w: 20 }
     ];
   }
   var cur = null;        // 当前节点（对象副本）
   var selId = null;      // 选中的元素
-  var pending = null;    // 'image' | 'bg'
+  var pending = null;    // 'image' | 'bg' | 'slot'
+  var pendingEl = null;  // slot 模式下要填的那个元素
   var mode = 'view';     // 'view' 看（与八闸同样显示）| 'edit' 编
 
   function setMode(m) {
@@ -397,6 +409,7 @@
     if (window.LEDGER) window.LEDGER.touch(id);
     if (marks[id]) marks[id].classList.add('read');
     if (elAside && window.buildCalendar) elAside.innerHTML = window.buildCalendar(false);
+    if (elPoem) elPoem.value = cur.poem || '';
     setMode('view');
     render();
   }
@@ -431,6 +444,10 @@
       d.style.fontSize = (e.size || 4.2) / 100 * canvasW() + 'px';
       d.textContent = e.text || '';
       d.style.lineHeight = '1.55';
+      if (!e.text) {
+        d.classList.add('is-empty');
+        d.dataset.hint = e.hint || '點此添加文字';
+      }
       if (e.vertical) {
         d.style.writingMode = 'vertical-rl';
         d.style.textOrientation = 'upright';
@@ -440,19 +457,37 @@
       } else {
         d.style.whiteSpace = 'pre-wrap';
       }
+    } else if (e.type === 'calendar') {
+      /* 日历：按自然尺寸渲染，再用 transform 缩放到 w% 宽 */
+      d.classList.add('cu-cal-wrap');
+      d.style.width = (e.w || 22) + '%';
+      var cal = document.createElement('div');
+      cal.className = 'cu-cal st-checkin';
+      cal.innerHTML = window.buildCalendar
+        ? window.buildCalendar(false)
+        : '<div class="ck-title">閘簿</div>';
+      d.appendChild(cal);
     } else {
-      /* 图片按“高度”定尺寸：这样竖长的场景图能撑满页面的高，
-         横屏、竖屏都不会变形或溢出 */
-      var img = document.createElement('img');
-      img.src = e.src;
-      img.alt = '';
-      img.draggable = false;
       d.style.height = (e.h || 40) + '%';
       d.style.width = 'auto';
-      img.style.height = '100%';
-      img.style.width = 'auto';
-      img.style.display = 'block';
-      d.appendChild(img);
+      if (!e.src) {
+        /* 空位：虚线框 + 提示，点一下选图 */
+        d.classList.add('cu-placeholder');
+        var ph = document.createElement('div');
+        ph.className = 'cu-ph';
+        ph.dataset.slot = e.slot || 'scene';
+        ph.textContent = (e.hint || '此處可以添加圖片').replace(/\n/g, ' ');
+        d.appendChild(ph);
+      } else {
+        var img = document.createElement('img');
+        img.src = e.src;
+        img.alt = '';
+        img.draggable = false;
+        img.style.height = '100%';
+        img.style.width = 'auto';
+        img.style.display = 'block';
+        d.appendChild(img);
+      }
     }
     if (e.id === selId) d.classList.add('sel');
     return d;
@@ -469,6 +504,7 @@
     (cur.els || []).forEach(function (e) {
       elCanvas.appendChild(elNode(e));
     });
+    fitCalendars();
     if (!(cur.els || []).length && !cur.bg) {
       var tip = document.createElement('div');
       tip.className = 'cu-tip';
@@ -476,6 +512,20 @@
       elCanvas.appendChild(tip);
     }
     placeHandle();
+  }
+
+  /* 日历按自然尺寸排版后，等比缩到元素宽度，并同步元素高度 */
+  function fitCalendars() {
+    var cw = elCanvas.clientWidth || 1;
+    Array.prototype.forEach.call(elCanvas.querySelectorAll('.cu-cal-wrap'), function (wrap) {
+      var inner = wrap.querySelector('.cu-cal');
+      if (!inner) return;
+      var target = wrap.offsetWidth || (parseFloat(wrap.style.width) / 100 * cw);
+      var natural = inner.offsetWidth || 268;
+      var k = target / natural;
+      inner.style.transform = 'scale(' + k + ')';
+      wrap.style.height = (inner.offsetHeight || 300) * k + 'px';
+    });
   }
 
   /* 选中框右下角的拉手（单独一个元素，不随内容重建） */
@@ -530,6 +580,22 @@
     var el2 = findEl(box.dataset.eid);
     if (!el2) return;
     select(el2.id);
+
+    /* 空占位：点一下直接放图 / 直接写字，不必先选中 */
+    if (box.classList.contains('cu-placeholder') || e.target.closest('.cu-ph')) {
+      pending = 'slot';
+      pendingEl = el2.id;
+      elFile.value = '';
+      elFile.click();
+      e.preventDefault();
+      return;
+    }
+    if (el2.type === 'text' && !el2.text) {
+      startEditText(box);
+      e.preventDefault();
+      return;
+    }
+
     if (box.classList.contains('editing')) return;      // 正在改字
     drag = {
       mode: 'move', id: el2.id, x0: e.clientX, y0: e.clientY,
@@ -539,6 +605,22 @@
     };
     e.preventDefault();
   });
+
+  /* 把一块文字切到可输入状态 */
+  function startEditText(box) {
+    box.classList.remove('is-empty');
+    box.removeAttribute('data-hint');
+    box.contentEditable = 'true';
+    box.classList.add('editing');
+    box.focus();
+    try {
+      var r = document.createRange();
+      r.selectNodeContents(box);
+      var s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    } catch (_) {}
+  }
 
   window.addEventListener('pointermove', function (e) {
     if (!drag || !cur) return;
@@ -571,18 +653,21 @@
           }
         }
       } else {
-        /* 文字：拖手柄同时缩放字号，整块文字一起变大变小 */
+        /* 文字 / 日历：拖手柄改宽度（文字同时缩放字号） */
         var dw = (e.clientX - drag.x0) / drag.cw * 100;
         var w0 = drag.w0 || 20;
         var maxW = Math.max(4, 100 - Math.max(0, Math.min(96, el.x)));
         var nw = Math.min(maxW, Math.max(4, w0 + dw));
-        var k = w0 > 0 ? nw / w0 : 1;
         el.w = nw;
-        el.size = Math.max(0.5, Math.min(18, (drag.size0 || 1.8) * k));
+        if (el.type === 'text') {
+          var k = w0 > 0 ? nw / w0 : 1;
+          el.size = Math.max(0.5, Math.min(18, (drag.size0 || 1.8) * k));
+        }
         if (node2) {
           node2.style.width = el.w + '%';
-          node2.style.fontSize = el.size / 100 * drag.cw + 'px';
+          if (el.type === 'text') node2.style.fontSize = el.size / 100 * drag.cw + 'px';
         }
+        if (el.type === 'calendar') fitCalendars();
       }
     }
     placeHandle();
@@ -683,6 +768,21 @@
     persist();
   }
 
+  /* 加一个日历块（可以拖、可以改大小） */
+  function addCalendar() {
+    if (!cur) return;
+    var has = (cur.els || []).some(function (x) { return x.type === 'calendar'; });
+    if (has) {
+      if (window.RULES) window.RULES.toast('這一頁已經有日曆了');
+      return;
+    }
+    var e = { id: uid('e'), type: 'calendar', x: 38, y: 62, w: 24 };
+    cur.els.push(e);
+    render();
+    select(e.id);
+    persist();
+  }
+
   elTools.addEventListener('click', function (e) {
     var b = e.target.closest('button[data-act]');
     if (!b || !cur) return;
@@ -691,6 +791,7 @@
     if (act === 'edit') { setMode('edit'); return; }
     if (act === 'done') { persist(); setMode('view'); return; }
     if (act === 'text') { addText(); return; }
+    if (act === 'calendar') { addCalendar(); return; }
     if (act === 'image') { pending = 'image'; elFile.value = ''; elFile.click(); return; }
     if (act === 'bg') { pending = 'bg'; elFile.value = ''; elFile.click(); return; }
     if (act === 'png') { toPNG(); return; }
@@ -736,6 +837,41 @@
   if (elPrev) elPrev.addEventListener('click', function () { if (cur) stepNode('cn', cur.id, -1); });
   if (elNext) elNext.addEventListener('click', function () { if (cur) stepNode('cn', cur.id, 1); });
 
+  /* 人物对白：编辑框，随时保存 */
+  var poemTimer = null;
+  if (elPoem) {
+    elPoem.addEventListener('input', function () {
+      if (!cur) return;
+      cur.poem = elPoem.value;
+      clearTimeout(poemTimer);
+      poemTimer = setTimeout(persist, 400);
+    });
+  }
+
+  /* 看的时候点人物：冒出对白 */
+  var bubbleEl = null, bubbleTimer = null;
+  function showBubble(text) {
+    if (!text) return;
+    if (!bubbleEl) {
+      bubbleEl = document.createElement('div');
+      bubbleEl.className = 'cu-bubble';
+      elCanvas.appendChild(bubbleEl);
+    }
+    bubbleEl.textContent = text;
+    bubbleEl.classList.add('on');
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(function () { bubbleEl.classList.remove('on'); }, 6000);
+  }
+
+  elCanvas.addEventListener('click', function (e) {
+    if (mode !== 'view' || !cur || !cur.poem) return;
+    var box = e.target.closest('.cu-el');
+    if (!box) return;
+    var el = findEl(box.dataset.eid);
+    if (!el || el.type !== 'image') return;
+    showBubble(cur.poem);
+  });
+
   elName.addEventListener('input', function () {
     if (!cur) return;
     cur.name = elName.value;
@@ -765,15 +901,26 @@
   elFile.addEventListener('change', function () {
     var f = elFile.files && elFile.files[0];
     if (!f || !cur) return;
+    var isSlot = (pending === 'slot');
     shrink(f, pending === 'bg' ? 1400 : 1100, function (url, ratio) {
       if (pending === 'bg') {
         cur.bg = url;
         render();
         persist();
+      } else if (isSlot && pendingEl) {
+        var el = findEl(pendingEl);
+        if (el) {
+          el.src = url;
+          el.ratio = ratio;
+          render();
+          select(el.id);
+          persist();
+        }
       } else {
         addImage(url, ratio);
       }
       pending = null;
+      pendingEl = null;
     });
   });
 
@@ -979,7 +1126,7 @@
     add: function (lon, lat, name) {
       var d = load();
       var n = { id: uid('c'), name: name || '私閘', lon: lon, lat: lat,
-                color: '#8C7B62', bg: '', els: makeDefaults(lon, lat) };
+                color: '#8C7B62', bg: '', els: makeDefaults() };
       d.nodes.push(n);
       save(d);
       paintMarkers();

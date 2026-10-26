@@ -10,6 +10,7 @@
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -48,11 +49,17 @@
 
       <aside id="colophon" aria-hidden="true"></aside>
 
+      <button id="snd" type="button" aria-pressed="false" title="开启环境声">静</button>
+      <button id="skip" type="button" title="略過開場鏡頭">跳過</button>
+
       <footer id="legend">
         <span class="dot gold"></span>運河
         <span class="dot red"></span>八閘
+        <button id="roster-btn" type="button" title="八闸名录">八閘名錄</button>
         <button id="mk-add" type="button" title="点地图上任一处，加一个自己的闸">＋ 私閘</button>
-        <span class="hint">拖动平移 · 滚轮缩放</span>
+        <button id="guide-btn" type="button" title="使用引导">引 導</button>
+        <span class="hint hint-wheel">拖动平移 · 滚轮缩放</span>
+        <span class="hint hint-touch">拖动 · 雙指縮放 · 點印入閘</span>
       </footer>
     </div>
 
@@ -67,6 +74,7 @@
           <button class="st-back" type="button">← 八閘總圖</button>
           <div class="st-name"><span class="st-ch"></span><h2></h2></div>
           <div class="st-seqn"></div>
+          <button class="st-edit" type="button" title="過完八閘後可編輯">編 輯</button>
           <div class="st-meta"></div>
         </header>
         <div class="st-body">
@@ -79,11 +87,12 @@
               <div class="st-verse"></div>
               <ul class="st-facts"></ul>
             </div>
-            <div class="st-checkin" aria-hidden="true"></div>
+            <div class="st-checkin"></div>
           </div>
           <figure class="st-figure">
             <img alt="">
             <div class="st-bubble" aria-hidden="true"></div>
+            <button class="st-q-toggle" type="button" aria-pressed="false" title="切換 Q 版 / 原立繪">Q 版</button>
           </figure>
         </div>
         <footer class="st-foot">
@@ -92,6 +101,7 @@
           <button class="st-next" type="button">下一閘 →</button>
         </footer>
       </div>
+      <div class="st-pass" aria-hidden="true"><span>過</span></div>
       <div class="st-gate" aria-hidden="true"></div>
     </section>
 
@@ -110,6 +120,7 @@
             <button type="button" data-act="text" class="edit-only">＋ 文字</button>
             <button type="button" data-act="image" class="edit-only">＋ 圖片</button>
             <button type="button" data-act="bg" class="edit-only">換背景</button>
+            <button type="button" data-act="calendar" class="edit-only">＋ 日曆</button>
             <button type="button" data-act="png">存為圖片</button>
             <button type="button" data-act="export" class="edit-only">匯出</button>
             <button type="button" data-act="import" class="edit-only">匯入</button>
@@ -121,9 +132,10 @@
           <div class="cu-stage">
             <div class="cu-canvas" tabindex="0"></div>
           </div>
-          <aside class="cu-aside">
-            <div class="st-checkin cu-checkin"></div>
-          </aside>
+        </div>
+        <div class="cu-poem">
+          <label>人物對白</label>
+          <input class="cu-poem-in" type="text" maxlength="60" placeholder="點人物時說的話（留空則不顯示）">
         </div>
         <footer class="cu-foot">
           <button class="cu-prev st-back" type="button">← 上一閘</button>
@@ -135,14 +147,75 @@
       <input type="file" class="cu-json" accept="application/json,.json" hidden>
     </section>
   </div>
+
+  <div id="roster-veil" hidden></div>
+  <aside id="roster" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="roster-title">
+    <header class="roster-head">
+      <div>
+        <span class="roster-kicker">大運河 · 八閘</span>
+        <h2 id="roster-title">八閘名錄</h2>
+      </div>
+      <button class="roster-close" type="button">收 起</button>
+    </header>
+    <ol class="roster-list"></ol>
+    <p class="roster-foot">點一閘進入；未開的閘會提示先過哪一閘。</p>
+  </aside>
+
+  <div id="guide-veil" hidden></div>
+  <section id="guide" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+    <button class="guide-close" type="button" aria-label="關閉引導">×</button>
+    <header class="guide-head">
+      <span class="guide-seal" aria-hidden="true">過</span>
+      <div class="guide-heading">
+        <span class="guide-kicker">初入此卷 · 大運河八閘</span>
+        <h2 id="guide-title">碰簽入閘，讀完過閘</h2>
+      </div>
+    </header>
+    <div class="guide-body">
+      <p class="guide-lead">這是一卷關於大運河八座閘壩的互動地圖。八枚 NFC 木紋書籤，對應八閘；碰簽入閘，也可以直接點地圖上的閘印。</p>
+      <ol class="guide-steps">
+        <li class="guide-step">
+          <span class="guide-num">一</span>
+          <div>
+            <h3>入閘</h3>
+            <p>把木紋書籤碰一下手機，或點地圖上的閘印。每一枚書籤，就是一座閘。</p>
+          </div>
+        </li>
+        <li class="guide-step">
+          <span class="guide-num">二</span>
+          <div>
+            <h3>過閘</h3>
+            <p>讀完場景、人物與考據，按頁腳「蓋印過閘」。閘簿記下這一天，下一閘開啟。</p>
+          </div>
+        </li>
+        <li class="guide-step">
+          <span class="guide-num">三</span>
+          <div>
+            <h3>再看</h3>
+            <p>進度存在這台手機；圖例「八閘名錄」可回看或跳閘，也可以自己加一座「私閘」。</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+    <footer class="guide-foot">
+      <p class="guide-note">進度只存在這台手機；之後可在圖例按「引導」重看。</p>
+      <button class="guide-start" type="button">開始過閘</button>
+    </footer>
+  </section>
+
   <script src="data/china_geo.js" onerror="window.__noRealGeo=1"></script>
   <script src="data/geo.js"></script>
   <script src="data/stations.js"></script>
   <script src="data/poems.js"></script>
   <script src="ledger.js"></script>
+  <script src="edits.js"></script>
+  <script src="rules.js"></script>
   <script src="station.js"></script>
   <script src="app.js"></script>
   <script src="custom.js"></script>
+  <script src="roster.js"></script>
+  <script src="guide.js"></script>
+  <script src="audio.js"></script>
   <script>
   /* 网站形态：注册 Service Worker，断网也能打开 */
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {

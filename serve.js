@@ -44,10 +44,13 @@ const server = http.createServer((req, res) => {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) return send(res, 404, '404 ' + url);
     const ext = path.extname(file).toLowerCase();
+    const noCache = ['.html', '.js', '.css', '.webmanifest', '.json'].indexOf(ext) >= 0;
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Content-Length': st.size,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600'
+      /* 开发期：代码一律不缓存，改完刷新即生效；图片才缓存 */
+      'Cache-Control': noCache ? 'no-store, max-age=0' : 'public, max-age=86400',
+      'Pragma': 'no-cache'
     });
     fs.createReadStream(file).pipe(res);
   });

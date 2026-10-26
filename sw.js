@@ -3,7 +3,7 @@
 
    ⚠ 更新网站后执行 `node bump.js`：它会把下面这行的日期戳改成当前时间。
      版本号一变，浏览器才会丢掉旧缓存、拉取新版本。 */
-const VERSION = 'guozha-20261025-1637';
+const VERSION = 'guozha-20261026-192505';
 const SHELL = [
   './',
   './index.html',
@@ -11,7 +11,12 @@ const SHELL = [
   './app.js',
   './station.js',
   './custom.js',
+  './roster.js',
+  './guide.js',
+  './audio.js',
   './ledger.js',
+  './edits.js',
+  './rules.js',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',

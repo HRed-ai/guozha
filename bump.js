@@ -12,7 +12,7 @@ if (!fs.existsSync(file)) {
 
 const d = new Date();
 const p = n => String(n).padStart(2, '0');
-const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 const next = `guozha-${stamp}`;
 
 const src = fs.readFileSync(file, 'utf8');

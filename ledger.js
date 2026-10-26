@@ -1,9 +1,9 @@
-/* 闸簿：一份数据记「哪天读过哪几闸」
+/* 闸簿：一份数据记「哪天过了哪几闸」
    结构 {
      v:1,
-     seen: { s01: '2026-10-25', ... },        每闸首次进入的日期
-     days: { '2026-10-25': ['s01','s03'], ... }, 每天读过哪些闸（去重，按进入顺序）
-     visits: 27                                总进入次数
+     seen: { s01: '2026-10-25', ... },        每闸首次过闸的日期（即“读过/已过”）
+     days: { '2026-10-25': ['s01','s03'], ... }, 每天过了哪些闸（去重，按过闸顺序）
+     visits: 27                                总过闸次数
    }
 */
 (function () {
@@ -56,7 +56,8 @@
     try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (_) {}
   }
 
-  /* 进入一闸：登记当天 + 首次日期 */
+  /* 进入一闸：登记当天 + 首次日期。
+     自定义闸没有「过闸」页，打开即算读过，所以仍用它。 */
   function touch(id) {
     var d = load();
     var k = dayKey();
@@ -69,13 +70,39 @@
     return { isNew: isNew, day: k, visits: d.visits, seen: Object.keys(d.seen).length };
   }
 
+  /* 过闸：读完并按下「過閘」时才记录。
+     同一天重复过同一闸不重复记；日期只记第一次过闸那天。 */
+  function pass(id) {
+    var d = load();
+    var k = dayKey();
+    var isNew = !d.seen[id];
+    if (!isNew) {
+      return { ok: true, isNew: false, day: d.seen[id], visits: d.visits };
+    }
+    d.seen[id] = k;
+    if (!d.days[k]) d.days[k] = [];
+    if (d.days[k].indexOf(id) < 0) d.days[k].push(id);
+    d.visits += 1;
+    save(d);
+    return { ok: true, isNew: true, day: k, visits: d.visits, seen: Object.keys(d.seen).length };
+  }
+
   function hasSeen(id) { return !!load().seen[id]; }
+
+  /* 签到次数：按「天」去重 —— 一天里反复打开只算一次 */
+  function checks(id) {
+    var d = load(), n = 0;
+    Object.keys(d.days).forEach(function (k) {
+      if (d.days[k] && d.days[k].indexOf(id) >= 0) n++;
+    });
+    return n;
+  }
 
   function dayKeys() { return Object.keys(load().days).sort(); }
 
   function seenIds() { return Object.keys(load().seen); }
 
-  /* 文牒：用八闸的简称字写出来 —— 读过哪几闸，就写哪几个字
+  /* 文牒：用八闸的简称字写出来 —— 去过哪几闸，就写哪几个字
      澄 宣 謝 荊 南 清 邵 龍（可写简体：谢 荆 龙；也可直接写全名） */
   var GLYPH = [
     { id: 's01', ch: '澄', alt: ['澄', '澄清', '澄清上闸', '澄清上閘'] },
@@ -154,7 +181,7 @@
   }
 
   window.LEDGER = {
-    load: load, touch: touch, hasSeen: hasSeen, dayKeys: dayKeys,
+    load: load, touch: touch, pass: pass, hasSeen: hasSeen, checks: checks, dayKeys: dayKeys,
     seenIds: seenIds, phrase: phrase, phraseSpaced: phraseSpaced,
     parse: parse, apply: apply, glyphs: GLYPH,
     exportJSON: exportJSON, reset: reset, dayKey: dayKey
